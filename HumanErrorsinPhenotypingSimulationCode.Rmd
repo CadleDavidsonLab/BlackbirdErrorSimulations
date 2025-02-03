@@ -1,0 +1,2031 @@
+---
+title: "Human Errors in Phenotyping Simulation Code"
+output: word_document
+date: '2024-04-18'
+---
+Missing Data: AVP omit 1 tray
+```{r}
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#---------------------------------------------------------------------------------------
+#-------- start for loop here --------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("C:/Users/Aliyah.Brewer/OneDrive - USDA/Desktop/Working Data/Working Data/Vamurensis_2ndrep_Ledbetter Results 2019.xlsx")
+
+# Randomly select a sheet to exclude
+sheet_to_exclude <- sample(sheets, 1)
+
+# Filter out the selected sheet from the list of sheets
+sheets_filtered <- sheets[sheets != sheet_to_exclude]
+
+#oops, accidently modified this once 
+# Read data from all sheets in file 
+sheet_data <- lapply(sheets_filtered, function(sheet) {
+  read_excel("C:/Users/Aliyah.Brewer/OneDrive - USDA/Desktop/Working Data/Working Data/Vamurensis_2ndrep_Ledbetter Results 2019.xlsx", sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+
+#--------
+#NOTE: in the AVP paper, the data with the highest variance explained is the area under the disease progression curve (AUDPC), second highest is the average of the lab data, not specific time points. So, for this first round, I'm going to average each row to see how that goes over in the analysis. 
+#-------
+
+
+#averaging each row as per note: 
+library(dplyr)
+pheno_matrix <- average_df %>%
+  filter(!is.na(ID)) %>%
+  mutate(Mean = rowMeans(select(., -ID), na.rm = TRUE)) %>%
+  select(ID, Mean)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+#---------------------------------------------------------------------------------------
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+data <- read.cross(format = "csvs", ".", "GOODrh_Amu_x_VlyPrl_geneticMap_4wayCross.csv", "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 0, error.prob = 1.0e-4)
+
+#Make sure to do permutation for each respective population
+#permMean <- scanone(data, pheno.col = "Mean", n.perm = 1000) 
+#summary(permMean)
+#for AVP, 5% is 3.76 LOD
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = "Mean", method = "hk")
+
+#plot to make sure things look right
+#plot <- plot(Meandata) 
+#plot <- abline(h = 3.76)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+  
+ # Create a vector of excluded sheet names repeated for each row
+  excluded_sheet_vector <- rep(sheet_to_exclude, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  excluded_sheet_df <- data.frame(Excluded_Sheet = excluded_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], excluded_sheet_df)
+
+} #--------end for loop here ---------
+#---------------------------------------------------------------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "AVPLODvaluesmissing1tray.csv", row.names = FALSE)
+
+AVPLODvaluesmissing1tray <- read.csv("AVPLODvaluesmissing1tray.csv")
+
+# Add a new column with the same word to each row
+AVPLODvaluesmissing1tray$Family <- "AVP"
+AVPLODvaluesmissing1tray$Type <- "Missing 1 Tray"
+
+# Write the updated dataframe to a new CSV file
+write.csv(AVPLODvaluesmissing1tray, "AVPLODvaluesmissing1tray.csv", row.names = FALSE)
+
+```
+Missing Data: NC omit 1 tray 
+```{r}
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#---------------------------------------------------------------------------------------
+#-------- start for loop here --------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("C:HwangExp_NCdata.xlsx")
+
+# Randomly select a sheet to exclude
+sheet_to_exclude <- sample(sheets, 1)
+
+# Filter out the selected sheet from the list of sheets
+sheets_filtered <- sheets[sheets != sheet_to_exclude]
+
+#oops, accidently modified this once 
+# Read data from all sheets in file 
+sheet_data <- lapply(sheets_filtered, function(sheet) {
+  read_excel(("C:HwangExp_NCdata.xlsx"), sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+#averaging each row as per note: 
+library(dplyr)
+pheno_matrix <- average_df %>%
+  filter(!is.na(ID)) %>%
+  mutate(Mean = rowMeans(select(., -ID), na.rm = TRUE)) %>%
+  select(ID, Mean)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+#---------------------------------------------------------------------------------------
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_Nor_x_Cab_4way_052920.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 0, error.prob = 1.0e-4)
+
+#Make sure to do permutation for each respective population
+#permMean <- scanone(data, pheno.col = "Mean", n.perm = 1000) 
+#summary(permMean)
+#for NC, 5% is 3.94 LOD 
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = "Mean", method = "hk")
+
+#plot to make sure things look right
+#plot <- plot(Meandata) 
+#plot <- abline(h = 3.76)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+  
+ # Create a vector of excluded sheet names repeated for each row
+  excluded_sheet_vector <- rep(sheet_to_exclude, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  excluded_sheet_df <- data.frame(Excluded_Sheet = excluded_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], excluded_sheet_df)
+
+} #--------end for loop here ---------
+#---------------------------------------------------------------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NCLODvaluesmissing1tray.csv", row.names = FALSE)
+
+NCLODvaluesmissing1tray <- read.csv("NCLODvaluesmissing1tray.csv")
+
+# Add a new column with the same word to each row
+NCLODvaluesmissing1tray$Family <- "NC"
+NCLODvaluesmissing1tray$Type <- "Missing 1 Tray"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NCLODvaluesmissing1tray, "NCLODvaluesmissing1tray.csv", row.names = FALSE)
+
+```
+Missing Data: NYVP omit 1 tray
+```{r}
+library(qtl)
+
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#---------------------------------------------------------------------------------------
+#-------- start for loop here --------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+
+# Randomly select a sheet to exclude
+sheet_to_exclude <- sample(sheets, 1)
+
+# Filter out the selected sheet from the list of sheets
+sheets_filtered <- sheets[sheets != sheet_to_exclude]
+
+#oops, accidently modified this once 
+# Read data from all sheets in file 
+sheet_data <- lapply(sheets_filtered, function(sheet) {
+  read_excel(("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx"), sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+#---------------------------------------------------------------------------------------
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 0, error.prob = 1.0e-4)
+
+#Make sure to do permutation for each respective population
+#permMean <- scanone(data, pheno.col = "Mean", n.perm = 1000) 
+#summary(permMean)
+#for NC, 5% is 3.94 LOD 
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+#plot to make sure things look right
+#plot <- plot(Meandata) 
+#plot <- abline(h = 3.76)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+  
+ # Create a vector of excluded sheet names repeated for each row
+  excluded_sheet_vector <- rep(sheet_to_exclude, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  excluded_sheet_df <- data.frame(Excluded_Sheet = excluded_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], excluded_sheet_df)
+
+} #--------end for loop here ---------
+#---------------------------------------------------------------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvaluesmissing1tray.csv", row.names = FALSE)
+
+NYVPLODvaluesmissing1tray <- read.csv("NYVPLODvaluesmissing1tray.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvaluesmissing1tray$Family <- "NYVP"
+NYVPLODvaluesmissing1tray$Type <- "Missing 1 Tray"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvaluesmissing1tray, "NYVPLODvaluesmissing1tray.csv", row.names = FALSE)
+
+```
+
+
+Missing Data: AVP omit 3 trays
+```{r}
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#-------- start for loop here ----------------------------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("C:/Users/Aliyah.Brewer/OneDrive - USDA/Desktop/Working Data/Working Data/Vamurensis_2ndrep_Ledbetter Results 2019.xlsx")
+
+# Randomly select three sheets to exclude
+sheets_to_exclude <- sample(sheets, 3)
+
+excluded_sheets_string <- paste(sheets_to_exclude, collapse = ", ")
+
+# Filter out the selected sheets from the list of sheets
+sheets_filtered <- sheets[!sheets %in% sheets_to_exclude]
+
+# Read data from the remaining sheets
+sheet_data <- lapply(sheets_filtered, function(sheet) {
+  read_excel("C:/Users/Aliyah.Brewer/OneDrive - USDA/Desktop/Working Data/Working Data/Vamurensis_2ndrep_Ledbetter Results 2019.xlsx", sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+
+#--------
+#NOTE: in the AVP paper, the data with the highest variance explained is the area under the disease progression curve (AUDPC), second highest is the average of the lab data, not specific time points. So, for this first round, I'm going to average each row to see how that goes over in the analysis. 
+#-------
+
+
+#averaging each row as per note: 
+library(dplyr)
+pheno_matrix <- average_df %>%
+  filter(!is.na(ID)) %>%
+  mutate(Mean = rowMeans(select(., -ID), na.rm = TRUE)) %>%
+  select(ID, Mean)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+library(qtl)
+data <- read.cross(format = "csvs", ".", "GOODrh_Amu_x_VlyPrl_geneticMap_4wayCross.csv", "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = "Mean", method = "hk")
+
+#plot <- plot(Meandata) 
+#plot <- abline(h = 3.76)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+
+ # Create a vector of excluded sheet names repeated for each row
+  #excluded_sheet_vector <- rep(sheets_to_exclude, each = 19)
+  excluded_sheet_vector <- rep(excluded_sheets_string, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  excluded_sheet_df <- data.frame(Excluded_Sheets = excluded_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], excluded_sheet_df)
+  
+} #--------end for loop here -----------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "AVPLODvaluesmissing3tray.csv", row.names = FALSE)
+```
+Missing Data: NC omit 3 trays 
+```{r}
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#-------- start for loop here ----------------------------------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("C:HwangExp_NCdata.xlsx")
+
+# Randomly select three sheets to exclude
+sheets_to_exclude <- sample(sheets, 3)
+
+excluded_sheets_string <- paste(sheets_to_exclude, collapse = ", ")
+
+# Filter out the selected sheets from the list of sheets
+sheets_filtered <- sheets[!sheets %in% sheets_to_exclude]
+
+# Read data from the remaining sheets
+sheet_data <- lapply(sheets_filtered, function(sheet) {
+  read_excel("C:HwangExp_NCdata.xlsx", sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+#averaging each row as per note: 
+library(dplyr)
+pheno_matrix <- average_df %>%
+  filter(!is.na(ID)) %>%
+  mutate(Mean = rowMeans(select(., -ID), na.rm = TRUE)) %>%
+  select(ID, Mean)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+library(qtl)
+data <- read.cross(format = "csvs", ".", "geneticMap_Nor_x_Cab_4way_052920.csv", "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = "Mean", method = "hk")
+
+#plot to make sure things look right
+#plot <- plot(Meandata) 
+#plot <- abline(h =)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+
+ # Create a vector of excluded sheet names repeated for each row
+  #excluded_sheet_vector <- rep(sheets_to_exclude, each = 19)
+  excluded_sheet_vector <- rep(excluded_sheets_string, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  excluded_sheet_df <- data.frame(Excluded_Sheets = excluded_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], excluded_sheet_df)
+  
+} #--------end for loop here -----------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NCLODvaluesmissing3tray.csv", row.names = FALSE)
+
+NCLODvaluesmissing3tray <- read.csv("NCLODvaluesmissing3tray.csv")
+
+# Add a new column with the same word to each row
+NCLODvaluesmissing3tray$Family <- "NC"
+NCLODvaluesmissing3tray$Type <- "Missing 3 Trays"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NCLODvaluesmissing3tray, "NCLODvaluesmissing3tray.csv", row.names = FALSE)
+```
+Missing Data: NYVP omit 3 trays 
+```{r}
+#--------
+#NOTE:  
+#Minor Effect Loci, ### (NYVP data)
+#Moderate Effect Loci, REN13 (NC data- )
+#Major Effect Loci, REN12 (AVP data- chromo 13)
+#-------
+
+#caluclating an average of the sheets from the phenotype workbook 
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#-------- start for loop here --------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+
+# Randomly select three sheets to exclude
+sheets_to_exclude <- sample(sheets, 3)
+
+excluded_sheets_string <- paste(sheets_to_exclude, collapse = ", ")
+
+# Filter out the selected sheets from the list of sheets
+sheets_filtered <- sheets[!sheets %in% sheets_to_exclude]
+
+# Read data from the remaining sheets
+sheet_data <- lapply(sheets_filtered, function(sheet) {
+  read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+
+#--------
+#NOTE: in the AVP paper, the data with the highest variance explained is the area under the disease progression curve (AUDPC), second highest is the average of the lab data, not specific time points. So, for this first round, I'm going to average each row to see how that goes over in the analysis. 
+#-------
+
+
+library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+library(qtl)
+setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+#Make sure to do permutation for each respective population - only done in the "normal" circumstance 
+#permMean <- scanone(data, pheno.col = "Mean", n.perm = 1000) 
+#summary(permMean)
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+#plot to make sure things look right
+#plot <- plot(Meandata) 
+#plot <- abline(h =)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+
+
+#from 1 tray   
+ # Create a vector of excluded sheet names repeated for each row
+  #excluded_sheet_vector <- rep(sheets_to_exclude, each = 19)
+  excluded_sheet_vector <- rep(excluded_sheets_string, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  excluded_sheet_df <- data.frame(Excluded_Sheets = excluded_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], excluded_sheet_df)
+  
+} #--------end for loop here ---------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvaluesmissing3tray.csv", row.names = FALSE)
+
+NYVPLODvaluesmissing3tray <- read.csv("NYVPLODvaluesmissing3tray.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvaluesmissing3tray$Family <- "NYVP"
+NYVPLODvaluesmissing3tray$Type <- "Missing 3 Trays"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvaluesmissing3tray, "NYVPLODvaluesmissing3tray.csv", row.names = FALSE)
+```
+
+
+Missing Data: AVP only pick 1 tray
+```{r}
+#--------
+#NOTE:  
+#Minor Effect Loci, ### (NYVP data)
+#Moderate Effect Loci, REN13 (NC data- )
+#Major Effect Loci, REN12 (AVP data- chromo 13)
+#-------
+
+#caluclating an average of the sheets from the phenotype workbook 
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#-------- start for loop here --------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("C:/Users/Aliyah.Brewer/OneDrive - USDA/Desktop/Working Data/Working Data/Vamurensis_2ndrep_Ledbetter Results 2019.xlsx")
+
+# Filter out all but one sheet from the list of sheets
+sheet_to_include <- sample(sheets, 1)
+
+# Read data from selected sheet
+sheet_data <- lapply(sheet_to_include, function(sheet) {
+  read_excel("C:/Users/Aliyah.Brewer/OneDrive - USDA/Desktop/Working Data/Working Data/Vamurensis_2ndrep_Ledbetter Results 2019.xlsx", sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+
+#--------
+#NOTE: in the AVP paper, the data with the highest variance explained is the area under the disease progression curve (AUDPC), second highest is the average of the lab data, not specific time points. So, for this first round, I'm going to average each row to see how that goes over in the analysis. 
+#-------
+
+
+#averaging each row as per note: 
+library(dplyr)
+pheno_matrix <- average_df %>%
+  filter(!is.na(ID)) %>%
+  mutate(Mean = rowMeans(select(., -ID), na.rm = TRUE)) %>%
+  select(ID, Mean)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+library(qtl)
+data <- read.cross(format = "csvs", ".", "GOODrh_Amu_x_VlyPrl_geneticMap_4wayCross.csv", "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+#Make sure to do permutation for each respective population - only done in the "normal" circumstance 
+#permMean <- scanone(data, pheno.col = "Mean", n.perm = 1000) 
+#summary(permMean)
+#for AVP, 5% is 3.76 LOD
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = "Mean", method = "hk")
+
+#plot to make sure things look right
+#plot <- plot(Meandata) 
+#plot <- abline(h = 3.76)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+  
+ # Create a vector of excluded sheet names repeated for each row
+  included_sheet_vector <- rep(sheet_to_include, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  included_sheet_df <- data.frame(Included_Sheet = included_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+
+
+} #--------end for loop here ---------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "AVPLODvaluesonly1tray.csv", row.names = FALSE)
+
+AVPLODvaluesonly1tray <- read.csv("AVPLODvaluesonly1tray.csv")
+
+# Add a new column with the same word to each row
+AVPLODvaluesonly1tray$Family <- "AVP"
+AVPLODvaluesonly1tray$Type <- "Only 1 Tray"
+
+# Write the updated dataframe to a new CSV file
+write.csv(AVPLODvaluesonly1tray, "AVPLODvaluesonly1tray.csv", row.names = FALSE)
+```
+Missing Data: NC only pick 1 tray 
+```{r}
+#--------
+#NOTE:  
+#Minor Effect Loci, ### (NYVP data)
+#Moderate Effect Loci, REN13 (NC data- )
+#Major Effect Loci, REN12 (AVP data- chromo 13)
+#-------
+
+#caluclating an average of the sheets from the phenotype workbook 
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#-------- start for loop here --------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("C:HwangExp_NCdata.xlsx")
+
+# Filter out all but one sheet from the list of sheets
+sheet_to_include <- sample(sheets, 1)
+
+# Read data from selected sheet
+sheet_data <- lapply(sheet_to_include, function(sheet) {
+  read_excel("C:HwangExp_NCdata.xlsx", sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+
+#--------
+#NOTE: in the AVP paper, the data with the highest variance explained is the area under the disease progression curve (AUDPC), second highest is the average of the lab data, not specific time points. So, for this first round, I'm going to average each row to see how that goes over in the analysis. 
+#-------
+
+
+#averaging each row as per note: 
+library(dplyr)
+pheno_matrix <- average_df %>%
+  filter(!is.na(ID)) %>%
+  mutate(Mean = rowMeans(select(., -ID), na.rm = TRUE)) %>%
+  select(ID, Mean)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+library(qtl)
+data <- read.cross(format = "csvs", ".", "geneticMap_Nor_x_Cab_4way_052920.csv", "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+#Make sure to do permutation for each respective population - only done in the "normal" circumstance 
+#permMean <- scanone(data, pheno.col = "Mean", n.perm = 1000) 
+#summary(permMean)
+#for AVP, 5% is 3.76 LOD
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = "Mean", method = "hk")
+
+#plot to make sure things look right
+#plot <- plot(Meandata) 
+#plot <- abline(h = 3.76)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+  
+ # Create a vector of excluded sheet names repeated for each row
+  included_sheet_vector <- rep(sheet_to_include, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  included_sheet_df <- data.frame(Included_Sheet = included_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+
+
+} #--------end for loop here ---------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NCLODvaluesonly1tray.csv", row.names = FALSE)
+
+NCLODvaluesonly1tray <- read.csv("NCLODvaluesonly1tray.csv")
+
+# Add a new column with the same word to each row
+NCLODvaluesonly1tray$Family <- "NC"
+NCLODvaluesonly1tray$Type <- "Only 1 Tray"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NCLODvaluesonly1tray, "NCLODvaluesonly1tray.csv", row.names = FALSE)
+```
+Missing Data: NYVP only pick 1 tray 
+```{r}
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#-------- start for loop here ----------------------------------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Import each respective sheet in BB pheno data excel workbook
+library(readxl)
+sheets <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+
+# Filter out all but one sheet from the list of sheets
+sheet_to_include <- sample(sheets, 1)
+
+# Read data from selected sheet
+sheet_data <- lapply(sheet_to_include, function(sheet) {
+  read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+})
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+
+library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+library(qtl)
+setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+  
+ # Create a vector of excluded sheet names repeated for each row
+  included_sheet_vector <- rep(sheet_to_include, each = 19)
+  
+  # Create a dataframe with the excluded sheet names repeated for each row
+  included_sheet_df <- data.frame(Included_Sheet = included_sheet_vector)
+  
+  # Bind the excluded sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+
+
+} #--------end for loop here -----------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvaluesonly1tray.csv", row.names = FALSE)
+
+NYVPLODvaluesonly1tray <- read.csv("NYVPLODvaluesonly1tray.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvaluesonly1tray$Family <- "NYVP"
+NYVPLODvaluesonly1tray$Type <- "Only 1 Tray"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvaluesonly1tray, "NYVPLODvaluesonly1tray.csv", row.names = FALSE)
+```
+
+
+Quant Increase and Decrease Scripts: Just change the constant for the quantitative change you'd like to perform 
+```{r}
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+#-------- start for loop here ----------------------------------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+  # Import each respective sheet in BB pheno data excel workbook
+  sheet_names <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+
+  # Read data from all sheets in file and set names to list
+  sheet_data <- setNames(lapply(sheet_names, function(sheet) {
+    read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+  }), sheet_names)
+
+  # Sample a random sheet
+  sheet_to_change <- sample(sheet_names, 1)
+
+  # Modify the selected sheet by multiplying its numeric columns by a constant----------------------------------------------------
+  constant = 1.2 
+  selected_sheet_data <- sheet_data[[sheet_to_change]]
+  selected_sheet_data <- selected_sheet_data %>%
+    mutate(across(where(is.numeric), ~ . * constant))
+
+  # Update the sheet_data list with the modified sheet
+  sheet_data[[sheet_to_change]] <- selected_sheet_data
+
+  # Assuming all sheets have the same dimensions
+  n_rows <- nrow(sheet_data[[1]])
+  n_cols <- ncol(sheet_data[[1]])
+  
+  # Create an empty data frame to store the averages
+  average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+  average_df[,1] <- sheet_data[[1]][,1] # Want to copy the ID character column 
+
+  # Assign row and column names
+  rownames(average_df) <- rownames(sheet_data[[1]])
+  colnames(average_df) <- colnames(sheet_data[[1]])
+
+  # Calculate average for each cell
+  for (i in 1:n_rows) {
+    for (j in 2:n_cols) {
+      average_df[i, j] <- calculate_average(sheet_data, i, j)
+    }
+  }
+
+
+library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+library(qtl)
+setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+  data <- jittermap(data)
+  data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+  # Run the QTL mapping
+  Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+  # Get summary of the results
+  summary_results <- summary(Meandata)
+
+  # Store the summary
+  Meandata_summaries[[b]] <- summary_results
+  
+  # Create a vector of included sheet names repeated for each row
+  included_sheet_vector <- rep(sheet_to_change, each = nrow(summary_results))
+  
+  # Create a dataframe with the included sheet names repeated for each row
+  included_sheet_df <- data.frame(Changed_Sheet = included_sheet_vector)
+  
+  # Bind the included sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+} 
+
+#} #--------end for loop here -----------------------------------------------------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvaluesQuantInc0.2.csv", row.names = FALSE)
+
+NYVPLODvaluesQuantInc0.2 <- read.csv("NYVPLODvaluesQuantInc0.2.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvaluesQuantInc0.2$Family <- "NYVP"
+NYVPLODvaluesQuantInc0.2$Type <- "Quantitative Increase of 0.2"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvaluesQuantInc0.2, "NYVPLODvaluesQuanInc0.2.csv", row.names = FALSE)
+```
+
+
+Swaps Scripts: only differ with how many for loops are in the made function 
+1 swap per tray 
+```{r}
+# Function to swap a random row with its neighboring row in a sheet
+swap_consecutive_rows <- function(sheet_data) {
+  # Randomly select a row index, excluding the last row to ensure it has a neighbor
+  row_index <- sample(2:(nrow(sheet_data) - 1), 1) # Exclude the first row (headers)
+  
+  # Swap the selected row with the next row, keeping the first column (ID) intact
+  temp_row <- sheet_data[row_index, -1] # Exclude the first column
+  sheet_data[row_index, -1] <- sheet_data[row_index + 1, -1]
+  sheet_data[row_index + 1, -1] <- temp_row
+  
+  return(sheet_data)
+}
+
+#----------------------------------------------------------------------------------------------------------
+#caluclating an average of the sheets from the phenotype workbook 
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+#----------------------------------------------------------------------------------------------------------
+
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+  # Import each respective sheet in BB pheno data excel workbook
+  sheet_names <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+ 
+  # Read data from all sheets in file and set names to list
+sheet_data <- setNames(lapply(sheet_names, function(sheet) {
+    read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+  }), sheet_names)
+
+  # Modify each sheet by swapping two consecutive rows
+  for (sheet in sheet_names) {
+    sheet_data[[sheet]] <- swap_consecutive_rows(sheet_data[[sheet]])
+  }
+
+  # Assuming all sheets have the same dimensions
+  n_rows <- nrow(sheet_data[[1]])
+  n_cols <- ncol(sheet_data[[1]])
+  
+  # Create an empty data frame to store the averages
+  average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+  average_df[,1] <- sheet_data[[1]][,1] # Want to copy the ID character column 
+
+  # Assign row and column names
+  rownames(average_df) <- rownames(sheet_data[[1]])
+  colnames(average_df) <- colnames(sheet_data[[1]])
+
+  # Calculate average for each cell
+  for (i in 1:n_rows) {
+    for (j in 2:n_cols) {
+      average_df[i, j] <- calculate_average(sheet_data, i, j)
+    }
+  }
+
+library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+  # To the QTL mapping
+ library(qtl)
+setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+  data <- jittermap(data)
+  data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+  # Run the QTL mapping
+  Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+  # Get summary of the results
+  summary_results <- summary(Meandata)
+
+  # Store the summary
+  Meandata_summaries[[b]] <- summary_results
+  
+  # Create a vector of included sheet names repeated for each row
+  included_sheet_vector <- rep(paste("Bootstrap", b), each = nrow(summary_results))
+  
+  # Create a dataframe with the included sheet names repeated for each row
+  included_sheet_df <- data.frame(Iteration_Number = included_sheet_vector)
+  
+  # Bind the included sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+} 
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvalues1swap.csv", row.names = FALSE)
+
+NYVPLODvalues1swap <- read.csv("NYVPLODvalues1swap.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvalues1swap$Family <- "NYVP"
+NYVPLODvalues1swap$Type <- "1 Swap Per Tray"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvalues1swap, "NYVPLODvalues1swap.csv", row.names = FALSE)
+```
+2 swaps per tray 
+```{r}
+ library(qtl)
+# Function to swap a random row with its neighboring row in a sheet
+swap_consecutive_rows <- function(sheet_data) {
+  # Perform the swap twice
+  for (i in 1:2) {
+    # Randomly select a row index, excluding the last row to ensure it has a neighbor
+    row_index <- sample(2:(nrow(sheet_data) - 1), 1) # Exclude the first row (headers)
+    
+    # Swap the selected row with the next row, keeping the first column (ID) intact
+    temp_row <- sheet_data[row_index, -1] # Exclude the first column
+    sheet_data[row_index, -1] <- sheet_data[row_index + 1, -1]
+    sheet_data[row_index + 1, -1] <- temp_row
+  }
+  
+  return(sheet_data)
+}
+
+#----------------------------------------------------------------------------------------------------------
+#caluclating an average of the sheets from the phenotype workbook 
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+#----------------------------------------------------------------------------------------------------------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+  # Import each respective sheet in BB pheno data excel workbook
+  sheet_names <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+
+  # Read data from all sheets in file and set names to list
+  sheet_data <- setNames(lapply(sheet_names, function(sheet) {
+    read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+  }), sheet_names)
+
+  # Modify each sheet by swapping two pairs of consecutive rows
+  for (sheet in sheet_names) {
+    sheet_data[[sheet]] <- swap_consecutive_rows(sheet_data[[sheet]])
+  }
+
+  # Assuming all sheets have the same dimensions
+  n_rows <- nrow(sheet_data[[1]])
+  n_cols <- ncol(sheet_data[[1]])
+  
+  # Create an empty data frame to store the averages
+  average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+  average_df[,1] <- sheet_data[[1]][,1] # Want to copy the ID character column 
+
+  # Assign row and column names
+  rownames(average_df) <- rownames(sheet_data[[1]])
+  colnames(average_df) <- colnames(sheet_data[[1]])
+
+  # Calculate average for each cell
+  for (i in 1:n_rows) {
+    for (j in 2:n_cols) {
+      average_df[i, j] <- calculate_average(sheet_data, i, j)
+    }
+  }
+
+ library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+  # To the QTL mapping
+  setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+  data <- jittermap(data)
+  data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+  # Run the QTL mapping
+  Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+  # Get summary of the results
+  summary_results <- summary(Meandata)
+
+  # Store the summary
+  Meandata_summaries[[b]] <- summary_results
+  
+  # Create a vector of included sheet names repeated for each row
+  included_sheet_vector <- rep(paste("Bootstrap", b), each = nrow(summary_results))
+  
+  # Create a dataframe with the included sheet names repeated for each row
+  included_sheet_df <- data.frame(Iteration_Number = included_sheet_vector)
+  
+  # Bind the included sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+} 
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvalues2swaps.csv", row.names = FALSE)
+
+NYVPLODvalues2swaps <- read.csv("NYVPLODvalues2swaps.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvalues2swaps$Family <- "NYVP"
+NYVPLODvalues2swaps$Type <- "2 Swaps Per Sheet"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvalues2swaps, "NYVPLODvalues2swaps.csv", row.names = FALSE)
+```
+3 swaps per tray
+```{r}
+# Function to swap a random row with its neighboring row in a sheet
+swap_consecutive_rows <- function(sheet_data) {
+  # Perform the swap twice
+  for (i in 1:3) {
+    # Randomly select a row index, excluding the last row to ensure it has a neighbor
+    row_index <- sample(2:(nrow(sheet_data) - 1), 1) # Exclude the first row (headers)
+    
+    # Swap the selected row with the next row, keeping the first column (ID) intact
+    temp_row <- sheet_data[row_index, -1] # Exclude the first column
+    sheet_data[row_index, -1] <- sheet_data[row_index + 1, -1]
+    sheet_data[row_index + 1, -1] <- temp_row
+  }
+  
+  return(sheet_data)
+}
+#----------------------------------------------------------------------------------------------------------
+#caluclating an average of the sheets from the phenotype workbook 
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+#----------------------------------------------------------------------------------------------------------
+
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+  # Import each respective sheet in BB pheno data excel workbook
+  sheet_names <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+
+  # Read data from all sheets in file and set names to list
+  sheet_data <- setNames(lapply(sheet_names, function(sheet) {
+    read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+  }), sheet_names)
+
+  # Modify each sheet by swapping two pairs of consecutive rows
+  for (sheet in sheet_names) {
+    sheet_data[[sheet]] <- swap_consecutive_rows(sheet_data[[sheet]])
+  }
+
+  # Assuming all sheets have the same dimensions
+  n_rows <- nrow(sheet_data[[1]])
+  n_cols <- ncol(sheet_data[[1]])
+  
+  # Create an empty data frame to store the averages
+  average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+  average_df[,1] <- sheet_data[[1]][,1] # Want to copy the ID character column 
+
+  # Assign row and column names
+  rownames(average_df) <- rownames(sheet_data[[1]])
+  colnames(average_df) <- colnames(sheet_data[[1]])
+
+  # Calculate average for each cell
+  for (i in 1:n_rows) {
+    for (j in 2:n_cols) {
+      average_df[i, j] <- calculate_average(sheet_data, i, j)
+    }
+  }
+
+ library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+  # To the QTL mapping
+  setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+  data <- jittermap(data)
+  data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+  # Run the QTL mapping
+  Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+  # Get summary of the results
+  summary_results <- summary(Meandata)
+
+  # Store the summary
+  Meandata_summaries[[b]] <- summary_results
+  
+  # Create a vector of included sheet names repeated for each row
+  included_sheet_vector <- rep(paste("Bootstrap", b), each = nrow(summary_results))
+  
+  # Create a dataframe with the included sheet names repeated for each row
+  included_sheet_df <- data.frame(Iteration_Number = included_sheet_vector)
+  
+  # Bind the included sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+} 
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvalues3swaps.csv", row.names = FALSE)
+
+NYVPLODvalues3swaps <- read.csv("NYVPLODvalues3swaps.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvalues3swaps$Family <- "NYVP"
+NYVPLODvalues3swaps$Type <- "3 Swaps Per Sheet"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvalues3swaps, "NYVPLODvalues3swaps.csv", row.names = FALSE)
+```
+
+
+Frameshift Scripts: 
+2 frameshifts per experiment (in 2 trays out of 8)
+```{r}
+#caluclating an average of the sheets from the phenotype workbook 
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+#------------------------------------------------------------------------------
+
+duplicate_and_shift_rows <- function(sheet_data) {
+  num_rows <- nrow(sheet_data)
+  num_cols <- ncol(sheet_data)
+  
+  # Ensure there are at least 6 rows in the data frame
+  if (num_rows < 6) {
+    stop("Data frame must contain at least 6 rows.")
+  }
+  
+  # Save the original ID column as a vector
+  original_id_col <- sheet_data[[1]]
+  
+  # Randomly select a row index (excluding the last 5 rows)
+  row_index <- sample(1:(num_rows - 5), 1)
+  
+  # Duplicate the selected row excluding the ID column
+  duplicated_row <- sheet_data[row_index, -1, drop = FALSE]
+  
+  # Append the duplicated row directly below the original row, keeping the ID column intact
+  sheet_data <- rbind(
+    sheet_data[1:row_index, ],
+    cbind(sheet_data[row_index, 1, drop = FALSE], duplicated_row),
+    sheet_data[(row_index + 1):num_rows, ]
+  )
+  
+  # Shift only the next 4 rows down (excluding the ID column)
+  num_rows_to_shift <- 4
+  for (i in seq(row_index + 1, row_index + num_rows_to_shift)) {
+    sheet_data[i + 1, -1] <- sheet_data[i, -1]
+  }
+  
+  # Delete the 6th shifted row (the row after the fifth row)
+  sheet_data <- sheet_data[-(row_index + num_rows_to_shift + 1), ]
+  
+  # Reassign the original ID column
+  sheet_data[[1]] <- original_id_col[1:nrow(sheet_data)]
+  
+  return(sheet_data)
+}
+
+#--------------------------------------------------------------------------------------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+  # Import each respective sheet in BB pheno data excel workbook
+  sheet_names <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+  
+  # Read data from all sheets in file and set names to list
+  sheet_data <- setNames(lapply(sheet_names, function(sheet) {
+    read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+  }), sheet_names)
+  
+# Randomly select 2 sheets from the list of sheet names
+sheets_to_modify <- sample(sheet_names, 2)
+
+modified_sheets_string <- paste(sheets_to_modify, collapse = ", ")
+
+# Apply the duplicate_and_shift_rows function to each selected sheet
+for (sheet in sheets_to_modify) {
+    sheet_data[[sheet]] <- duplicate_and_shift_rows(sheet_data[[sheet]])
+  }
+
+  # Assuming all sheets have the same dimensions
+  n_rows <- nrow(sheet_data[[1]])
+  n_cols <- ncol(sheet_data[[1]])
+  
+  # Create an empty data frame to store the averages
+  average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+  average_df[,1] <- sheet_data[[1]][,1] # Want to copy the ID character column 
+
+  # Assign row and column names
+  rownames(average_df) <- rownames(sheet_data[[1]])
+  colnames(average_df) <- colnames(sheet_data[[1]])
+
+  # Calculate average for each cell
+  for (i in 1:n_rows) {
+    for (j in 2:n_cols) {
+      average_df[i, j] <- calculate_average(sheet_data, i, j)
+   }
+  }
+
+
+  library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+  # To the QTL mapping
+  setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+  data <- jittermap(data)
+  data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+  # Run the QTL mapping
+  Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+  # Get summary of the results
+  summary_results <- summary(Meandata)
+
+  # Store the summary
+  Meandata_summaries[[b]] <- summary_results
+  
+  # Create a vector of included sheet names repeated for each row
+  included_sheet_vector <- rep(modified_sheets_string, each = 19)
+  
+  included_sheet_df <- data.frame("Frameshift Trays" = included_sheet_vector)
+  
+  # Bind the included sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+} 
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvalues2frameshifts.csv", row.names = FALSE)
+
+NYVPLODvalues2frameshifts <- read.csv("NYVPLODvalues2frameshifts.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvalues2frameshifts$Family <- "NYVP"
+NYVPLODvalues2frameshifts$Type <- "2 Frameshifts"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvalues2frameshifts, "NYVPLODvalues2frameshifts.csv", row.names = FALSE)
+```
+4 frameshifts per experiment (in 4 trays out of 8)
+```{r}
+#caluclating an average of the sheets from the phenotype workbook 
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+#------------------------------------------------------------------------------
+
+duplicate_and_shift_rows <- function(sheet_data) {
+  num_rows <- nrow(sheet_data)
+  num_cols <- ncol(sheet_data)
+  
+  # Ensure there are at least 6 rows in the data frame
+  if (num_rows < 6) {
+    stop("Data frame must contain at least 6 rows.")
+  }
+  
+  # Save the original ID column as a vector
+  original_id_col <- sheet_data[[1]]
+  
+  # Randomly select a row index (excluding the last 5 rows)
+  row_index <- sample(1:(num_rows - 5), 1)
+  
+  # Duplicate the selected row excluding the ID column
+  duplicated_row <- sheet_data[row_index, -1, drop = FALSE]
+  
+  # Append the duplicated row directly below the original row, keeping the ID column intact
+  sheet_data <- rbind(
+    sheet_data[1:row_index, ],
+    cbind(sheet_data[row_index, 1, drop = FALSE], duplicated_row),
+    sheet_data[(row_index + 1):num_rows, ]
+  )
+  
+  # Shift only the next 4 rows down (excluding the ID column)
+  num_rows_to_shift <- 4
+  for (i in seq(row_index + 1, row_index + num_rows_to_shift)) {
+    sheet_data[i + 1, -1] <- sheet_data[i, -1]
+  }
+  
+  # Delete the 6th shifted row (the row after the fifth row)
+  sheet_data <- sheet_data[-(row_index + num_rows_to_shift + 1), ]
+  
+  # Reassign the original ID column
+  sheet_data[[1]] <- original_id_col[1:nrow(sheet_data)]
+  
+  return(sheet_data)
+}
+
+#----------------------------------------------------------------------------------------------------------------
+n_bootstraps <- 1000
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+  # Import each respective sheet in BB pheno data excel workbook
+  sheet_names <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx")
+  
+# Initialize a vector to store selected sheet names
+selected_sheets <- character(0)
+
+# Loop to randomly select sheets
+for (i in 1:4) {  # Modify 4 to the desired number of sheets to select
+    # Generate a list of available sheets (excluding those already selected)
+    available_sheets <- setdiff(sheet_names, selected_sheets)
+    
+    # Randomly select a sheet from the available ones
+    selected_sheet <- sample(available_sheets, 1)
+    
+    # Add the selected sheet to the list of selected sheets
+    selected_sheets <- c(selected_sheets, selected_sheet)
+}
+
+# Combine the selected sheet names into a single string
+modified_sheets_string <- paste(selected_sheets, collapse = ", ")
+
+  # Read data from all sheets in file and set names to list
+  sheet_data <- setNames(lapply(sheet_names, function(sheet) {
+    read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+  }), sheet_names)
+
+# Apply the duplicate_and_shift_rows function to each selected sheet
+for (sheet in selected_sheet) {
+    sheet_data[[sheet]] <- duplicate_and_shift_rows(sheet_data[[sheet]])
+  }
+
+  # Assuming all sheets have the same dimensions
+  n_rows <- nrow(sheet_data[[1]])
+  n_cols <- ncol(sheet_data[[1]])
+  
+  # Create an empty data frame to store the averages
+  average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+  average_df[,1] <- sheet_data[[1]][,1] # Want to copy the ID character column 
+
+  # Assign row and column names
+  rownames(average_df) <- rownames(sheet_data[[1]])
+  colnames(average_df) <- colnames(sheet_data[[1]])
+
+  # Calculate average for each cell
+  for (i in 1:n_rows) {
+    for (j in 2:n_cols) {
+      average_df[i, j] <- calculate_average(sheet_data, i, j)
+   }
+  }
+
+
+  library(dplyr)
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+  # To the QTL mapping
+  setwd("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Working Data ")
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+  data <- jittermap(data)
+  data <- calc.genoprob(data, step = 1, error.prob = 0.001)
+
+  # Run the QTL mapping
+  Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+  # Get summary of the results
+  summary_results <- summary(Meandata)
+
+  # Store the summary
+  Meandata_summaries[[b]] <- summary_results
+  
+  # Create a vector of included sheet names repeated for each row
+  included_sheet_vector <- rep(modified_sheets_string, each = 19)
+  
+  included_sheet_df <- data.frame("Frameshift Trays" = included_sheet_vector)
+  
+  # Bind the included sheet dataframe as a new column to each summary
+  Meandata_summaries[[b]] <- cbind(Meandata_summaries[[b]], included_sheet_df)
+} 
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvalues4frameshifts.csv", row.names = FALSE)
+
+NYVPLODvalues4frameshifts <- read.csv("NYVPLODvalues4frameshifts.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvalues4frameshifts$Family <- "NYVP"
+NYVPLODvalues4frameshifts$Type <- "4 Frameshifts"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvalues4frameshifts, "NYVPLODvalues4frameshifts.csv", row.names = FALSE)
+```

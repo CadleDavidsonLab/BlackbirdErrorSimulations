@@ -1,0 +1,382 @@
+---
+title: "ReproducingOriginalResults_NoErrorSimulations"
+output: html_document
+date: "02/03/2025"
+---
+AVP Family (amurensis Valley Pearl): Large effect QTL, REN12 on Chromo 13
+```{r}
+library(qtl)
+library(dplyr)
+library(readxl)
+
+setwd("~/Desktop/Research/Modelling Errors in Pheno/Final Data ")
+
+#Import each respective sheet in BB pheno data excel workbook
+sheets <- excel_sheets("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Final Data /Vamurensis_2ndrep_Ledbetter Results 2019.xlsx")
+
+sheet_data <- lapply(sheets, function(sheet) {
+  read_excel("/Users/aliyahbrewer/Desktop/Research/Modelling Errors in Pheno/Final Data /Vamurensis_2ndrep_Ledbetter Results 2019.xlsx", sheet = sheet)
+})
+
+#---------------------------------------------------------------------------------------
+
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+#---------------------------------------------------------------------------------------
+
+#-------- start for loop here --------
+n_bootstraps <- 500
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+#---------------------------------------------------------------------------------------
+
+#--------
+#NOTE: in the AVP paper, the data with the highest variance explained is the area under the disease progression curve (AUDPC), second highest is the average of the lab data, not specific time points. So, for this first round, I'm going to average each row to see how that goes over in the analysis. 
+#-------
+
+#averaging each row as per note: 
+pheno_matrix <- average_df %>%
+  filter(!is.na(ID)) %>%
+  mutate(Mean = rowMeans(dplyr::select(., -ID), na.rm = TRUE))
+  
+pheno_matrix <- pheno_matrix %>% dplyr::select(ID, Mean)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+#---------------------------------------------------------------------------------------
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+data <- read.cross(format = "csvs", ".", "GOODrh_Amu_x_VlyPrl_geneticMap_4wayCross.csv", "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 0, error.prob = 1.0e-4)
+
+#Make sure to do permutation for each respective population
+#permMean <- scanone(data, pheno.col = "Mean", n.perm = 1000) 
+#summary(permMean)
+#for AVP, 5% is 3.76 LOD
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+#plot <- plot(Meandata) 
+#plot <- abline(h = 3.76)
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+
+} #--------end for loop here ---------
+
+#---------------------------------------------------------------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "AVPLODvaluesnormal.csv", row.names = FALSE)
+
+AVPLODvaluesnormal <- read.csv("AVPLODvaluesnormal.csv")
+
+# Add a new column with the same word to each row
+AVPLODvaluesnormal$Family <- "AVP"
+AVPLODvaluesnormal$Type <- "Normal"
+
+# Write the updated dataframe to a new CSV file
+write.csv(AVPLODvaluesnormal, "AVPLODvaluesnormal.csv", row.names = FALSE)
+```
+
+NC Family (Norton): Medium effect QTL, REN13 on Chromo 8
+```{r}
+library(qtl)
+library(dplyr)
+library(rlang)  # To use sym() function
+library(readxl)
+
+setwd("~/Desktop/Research/Modelling Errors in Pheno/Final Data ")
+
+#Import each respective sheet in BB pheno data excel workbook
+sheets <- excel_sheets("~/Desktop/Research/Modelling Errors in Pheno/Final Data /HwangExp_NCdata.xlsx")
+
+sheet_data <- lapply(sheets, function(sheet) {
+  read_excel("~/Desktop/Research/Modelling Errors in Pheno/Final Data /HwangExp_NCdata.xlsx", sheet = sheet)
+})
+
+#---------------------------------------------------------------------------------------
+
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+#---------------------------------------------------------------------------------------
+
+#-------- start for loop here --------
+n_bootstraps <- 500
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+#---------------------------------------------------------------------------------------
+
+#--------
+#NOTE: in the NC paper, highest LOD score was observed in 4dpi, so only doing that column of phenotype for this analysis  
+#-------
+
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+#---------------------------------------------------------------------------------------
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+data <- read.cross(format = "csvs", ".", "geneticMap_Nor_x_Cab_4way_052920.csv", "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 0, error.prob = 1.0e-4)
+
+#Make sure to do permutation for each respective population
+#permMean <- scanone(data, pheno.col = 3, n.perm = 1000) 
+#summary(permMean)
+#for NC, 5% is 4.06 LOD
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+#plot <- plot(Meandata) 
+#plot <- abline(h = )
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+
+} #--------end for loop here ---------
+
+#---------------------------------------------------------------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NCLODvaluesnormal.csv", row.names = FALSE)
+
+NCLODvaluesnormal <- read.csv("NCLODvaluesnormal.csv")
+
+# Add a new column with the same word to each row
+NCLODvaluesnormal$Family <- "NC"
+NCLODvaluesnormal$Type <- "Normal"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NCLODvaluesnormal, "NCLODvaluesnormal.csv", row.names = FALSE)
+```
+
+NYVP Family (NY84 x Pillans): Small effect QTLs (2), unnamed (Chromo 7 and 9)
+```{r}
+library(qtl)
+library(dplyr)
+library(rlang)  # To use sym() function
+library(readxl)
+
+
+setwd("~/Desktop/Research/Modelling Errors in Pheno/Final Data ")
+
+#Import each respective sheet in BB pheno data excel workbook
+sheets <- excel_sheets("~/Desktop/Research/Modelling Errors in Pheno/Final Data /ReischNY84xPillans_Results 2019.xlsx")
+
+sheet_data <- lapply(sheets, function(sheet) {
+  read_excel("~/Desktop/Research/Modelling Errors in Pheno/Final Data /ReischNY84xPillans_Results 2019.xlsx", sheet = sheet)
+})
+
+#---------------------------------------------------------------------------------------
+
+# Function to calculate average of corresponding cells
+calculate_average <- function(sheets_data, row, col) {
+  values <- sapply(sheets_data, function(sheet) {
+    cell_value <- sheet[[row, col]]
+     #print(cell_value)
+    if (is.na(cell_value) || !is.numeric(cell_value)) {
+      return(NA)
+    } else {
+      return(cell_value)
+    }
+  })
+  numeric_values <- as.numeric(values[!is.na(values)])
+  if (length(numeric_values) > 0) {
+    return(mean(numeric_values))
+  } else {
+    return(NA)
+  }
+}
+
+# Assuming all sheets have the same dimensions
+n_rows <- nrow(sheet_data[[1]])
+n_cols <- ncol(sheet_data[[1]])
+#---------------------------------------------------------------------------------------
+
+#-------- start for loop here --------
+n_bootstraps <- 500
+highest_lod <- numeric(n_bootstraps)
+Meandata_summaries <- list()
+
+for (b in 1:n_bootstraps) {
+  cat("Bootstrap iteration:", b, "\n")
+  
+# Create an empty data frame to store the averages
+average_df <- data.frame(matrix(NA, nrow = n_rows, ncol = n_cols))
+average_df[,1] <- sheet_data[[1]][,1] #want to copy the ID character column 
+
+# Assign row and column names
+rownames(average_df) <- rownames(sheet_data[[1]])
+colnames(average_df) <- colnames(sheet_data[[1]])
+
+# Calculate average for each cell
+for (i in 1:n_rows) {
+  for (j in 2:n_cols) {
+    average_df[i, j] <- calculate_average(sheet_data, i, j)
+  }
+}
+#print(average_df)
+#---------------------------------------------------------------------------------------
+
+#--------
+#NOTE: Infection severity on 4 DAI (IS4) was the only most-effective trait in this study, enabling the identification of both QTLs regardless of the measurement method.  
+
+#NOTE: in the NYVP paper, highest LOD score was observed in hyphae4dpi, so only doing that column of phenotype for this analysis  
+#-------
+
+# Select the ID column and the specified column (e.g., 4dpi column)
+  specified_column <- "Hyphae 4dpi" # Replace with the actual name of the column you want
+  pheno_matrix <- average_df %>%
+    dplyr::select(ID, specified_column)
+
+#print(pheno_matrix)
+write.csv(pheno_matrix, "finalpheno.csv")
+
+#---------------------------------------------------------------------------------------
+
+#to the QTL mapping:
+#edit genetic map we input here for specific family 
+data <- read.cross(format = "csvs", ".", genfile = "geneticMap_RupP_x_Ny84_SxAvg_4wayCross.csv", phefile = "finalpheno.csv", na.strings = "NA", genotypes = NULL)
+data <- jittermap(data)
+data <- calc.genoprob(data, step = 0, error.prob = 1.0e-4)
+
+#permMean <- scanone(data, pheno.col = 3, n.perm = 1000) 
+#summary(permMean)
+#for NYVP, 5% is 3.7 LOD
+
+#run the QTL mapping 
+Meandata <- scanone(data, pheno.col = 3, method = "hk")
+
+#plot <- plot(Meandata) 
+#plot <- abline(h = )
+
+# Get summary of the results
+summary_results <- summary(Meandata)
+
+# Store the summary
+Meandata_summaries[[b]] <- summary_results
+
+} #--------end for loop here ---------
+
+#---------------------------------------------------------------------------------------
+
+# Combine all summaries into a single data frame
+combined_summaries <- do.call(rbind, Meandata_summaries)
+
+#CHANGE THE NAME OF THE CSV OUTPUT
+# Write combined summaries to CSV
+write.csv(combined_summaries, "NYVPLODvaluesnormal.csv", row.names = FALSE)
+
+NYVPLODvaluesnormal <- read.csv("NYVPLODvaluesnormal.csv")
+
+# Add a new column with the same word to each row
+NYVPLODvaluesnormal$Family <- "NYVP"
+NYVPLODvaluesnormal$Type <- "Normal"
+
+# Write the updated dataframe to a new CSV file
+write.csv(NYVPLODvaluesnormal, "NYVPLODvaluesnormal.csv", row.names = FALSE)
+```
